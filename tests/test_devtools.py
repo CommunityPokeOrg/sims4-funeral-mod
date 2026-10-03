@@ -19,10 +19,12 @@ from funeral_mod.config import FuneralConfig
 from funeral_mod.dbg import (
     DebitRecord,
     describe_event,
+    filter_debits_for_zone,
     format_debit_summary,
     format_funds_row,
     format_money,
     format_object_check,
+    name_matches,
     summarize_debits,
 )
 
@@ -49,6 +51,40 @@ class TestDebugConfig(unittest.TestCase):
     def test_log_filename(self):
         self.assertEqual(FuneralConfig.DEBUG_LOG_FILENAME,
                          'funeral_mod_debug.log')
+
+    def test_phone_keywords_configured(self):
+        self.assertTrue(FuneralConfig.PHONE_OBJECT_NAME_KEYWORDS)
+        self.assertIn('phone', FuneralConfig.PHONE_OBJECT_NAME_KEYWORDS)
+
+
+class TestNameMatches(unittest.TestCase):
+
+    def test_urnstone_keyword_hit(self):
+        self.assertTrue(name_matches(
+            'urnstone_grave', FuneralConfig.FUNERAL_OBJECT_NAME_KEYWORDS))
+
+    def test_case_insensitive(self):
+        self.assertTrue(name_matches('GraveStone_02', ('gravestone',)))
+
+    def test_miss(self):
+        self.assertFalse(name_matches('dining_table', ('urn', 'grave')))
+
+    def test_empty_name(self):
+        self.assertFalse(name_matches('', ('urn',)))
+        self.assertFalse(name_matches(None, ('urn',)))
+
+
+class TestFilterDebitsForZone(unittest.TestCase):
+
+    def test_zone_filtering(self):
+        records = [
+            DebitRecord(1, 'host', 764, 1000, 236, True, zone_id=7),
+            DebitRecord(2, 'attendee', 63, 100, 37, True, zone_id=7),
+            DebitRecord(3, 'attendee', 63, 50, 0, False, zone_id=9),
+            DebitRecord(4, 'misc', 10, None, None, True),  # untagged
+        ]
+        z7 = filter_debits_for_zone(records, 7)
+        self.assertEqual([r.sim_id for r in z7], [1, 2, 4])
 
 
 class TestFormatMoney(unittest.TestCase):

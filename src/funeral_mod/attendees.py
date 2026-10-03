@@ -10,7 +10,18 @@ Dead Sims (ghosts), infants/toddlers filter-free (kept simple), and the host
 themselves are excluded.
 """
 
-from ui.ui_dialog_picker import SimPickerRow, UiDialogObjectPicker, UiSimPicker
+# The picker classes live in ui.ui_dialog_picker in current builds, but the
+# exact names have moved between patches.  Import defensively: a picker-API
+# mismatch must degrade to a private funeral, never kill the whole mod at
+# package-init time (which would silently disable every interaction).
+try:
+    from ui.ui_dialog_picker import SimPickerRow, UiDialogObjectPicker, UiSimPicker
+except ImportError:
+    try:
+        from ui.ui_dialog_picker import UiDialogObjectPicker, UiSimPicker
+        SimPickerRow = None
+    except ImportError:
+        SimPickerRow = UiDialogObjectPicker = UiSimPicker = None
 
 import services
 import sims4.log
@@ -101,6 +112,10 @@ def build_picker(owner_sim, rows, config=FuneralConfig):
     Returns a UiSimPicker dialog ready to ``show_dialog()``, or None if the
     dialog could not be constructed in this game version.
     """
+    if UiSimPicker is None or UiDialogObjectPicker is None:
+        logger.warn('ui_dialog_picker classes unavailable in this build; '
+                    'attendee picker cannot be shown')
+        return None
     try:
         max_sel = create_factory_wrapper(
             UiDialogObjectPicker._MaxSelectableStatic,
@@ -127,6 +142,11 @@ def build_picker(owner_sim, rows, config=FuneralConfig):
 
     for (sim_info, affordable) in rows:
         try:
+            if SimPickerRow is None:
+                # Older/newer UI kits without SimPickerRow: rows cannot be
+                # built, so report the picker as unavailable.
+                logger.warn('SimPickerRow unavailable; picker rows cannot be built')
+                return None
             row = SimPickerRow(
                 sim_id=sim_info.sim_id,
                 tag=sim_info.sim_id,

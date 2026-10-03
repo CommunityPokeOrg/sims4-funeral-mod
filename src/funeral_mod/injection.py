@@ -96,6 +96,11 @@ def on_load_complete(manager_type):
 
     Same pattern as Frank's ``on_load_complete`` used by Lot51 — this is the
     safe point to mutate tuned instances (e.g. append super affordances).
+
+    If the manager already finished loading before this callback was
+    registered (script mods can init late in the load sequence), the
+    callback is run immediately instead of never firing — a missed
+    registration otherwise disables every injected interaction silently.
     """
 
     def wrapper(function):
@@ -106,6 +111,16 @@ def on_load_complete(manager_type):
             except Exception:
                 logger.exception('on_load_complete callback failed for manager %s', manager_type)
 
-        get_instance_manager(manager_type).add_on_load_complete(safe_function)
+        try:
+            manager = get_instance_manager(manager_type)
+        except Exception:
+            logger.exception('instance manager %s unavailable at registration', manager_type)
+            return
+        manager.add_on_load_complete(safe_function)
+        if getattr(manager, 'types', None):
+            # Tuning already loaded — the callback list will not fire again
+            # for this pass, so run it now.
+            logger.info('manager %s already loaded; running injection immediately', manager_type)
+            safe_function(manager)
 
     return wrapper

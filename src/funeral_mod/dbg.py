@@ -142,3 +142,15 @@ def format_funds_row(label, sim_id, money, affordable=None):
     if affordable is not None:
         row += ' {}'.format('affordable' if affordable else 'TOO EXPENSIVE')
     return row
+
+
+def name_matches(name, keywords):
+    """Case-insensitive substring match of ``name`` against ``keywords``."""
+    lowered = (name or '').lower()
+    return any(keyword in lowered for keyword in keywords)
+
+
+def filter_debits_for_zone(records, zone_id):
+    """Debits belonging to ``zone_id`` (untagged records are always kept)."""
+    return [r for r in records
+            if getattr(r, 'zone_id', None) in (None, zone_id)]

@@ -21,6 +21,13 @@ def _report_import_failure(what, exc):
         # Outside the game (unit tests) there is no sims4.log.
         import traceback
         traceback.print_exception(type(exc), exc, exc.__traceback__)
+    try:
+        # The file log imports nothing from the game, so it is the most
+        # reliable place to surface an init failure.
+        from funeral_mod import debug_log
+        debug_log.exception('import failure: %s', what)
+    except Exception:
+        pass
 
 
 try:
@@ -32,5 +39,11 @@ try:
     import funeral_mod.commands  # noqa: F401
 except Exception as _exc:
     _report_import_failure('command registration', _exc)
+
+try:
+    from funeral_mod import debug_log as _debug_log
+    _debug_log.info('%s v%s package initialized', MOD_NAME, MOD_VERSION)
+except Exception:
+    pass
 
 __all__ = ('MOD_NAME', 'MOD_VERSION')

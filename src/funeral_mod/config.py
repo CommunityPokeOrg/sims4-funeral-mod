@@ -56,6 +56,16 @@ class FuneralConfig:
     # also added here so it is reachable by clicking a Sim.
     SIM_OBJECT_NAME = 'sim'
 
+    # Substrings matched against tuned object names to find phone-like
+    # objects.  The Sim affordances (Plan/Conclude Funeral) are injected
+    # here too so the entry is reachable via the phone menu as well;
+    # pure best-effort — a miss only means no phone entry.
+    PHONE_OBJECT_NAME_KEYWORDS = (
+        'phone',
+        'cellphone',
+        'smartphone',
+    )
+
     # Substrings matched (case-insensitively) against tuned buff names to
     # find the mourning/sad moodlet applied to attendees.  The first buff
     # that matches any keyword wins.

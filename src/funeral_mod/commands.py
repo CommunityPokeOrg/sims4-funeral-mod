@@ -10,6 +10,7 @@ Open the cheat console (Ctrl+Shift+C) and type:
     funeral.plan            – dump the active funeral incl. paid attendee ids
     funeral.money           – household funds of selected Sim + host/attendees
     funeral.attendees       – dry-run of the invite picker for the selected Sim
+    funeral.objects [word]  – scan tuned object names; shows which carry Plan Funeral
     funeral.debug on|info|off – toggle the funeral_mod_debug.log file
     funeral.log             – print the tail of the debug log file
 """
@@ -102,6 +103,18 @@ def _funeral_money(_connection=None):
             output(line)
     except Exception as exc:
         output('funeral.money failed: {!r}'.format(exc))
+        return False
+    return True
+
+
+@Command('funeral.objects', command_type=CommandType.Live)
+def _funeral_objects(keyword: str = '', _connection=None):
+    output = Output(_connection)
+    try:
+        for line in devtools.objects_lines(keyword):
+            output(line)
+    except Exception as exc:
+        output('funeral.objects failed: {!r}'.format(exc))
         return False
     return True
 

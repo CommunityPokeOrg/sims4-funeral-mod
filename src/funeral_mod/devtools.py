@@ -16,10 +16,12 @@ from funeral_mod.attendees import gather_attendee_candidates
 from funeral_mod.config import FuneralConfig
 from funeral_mod.dbg import (
     describe_event,
+    filter_debits_for_zone,
     format_debit_summary,
     format_funds_row,
     format_money,
     format_object_check,
+    name_matches,
 )
 from funeral_mod.funds import can_afford, get_funds
 from funeral_mod.interactions import (
@@ -97,10 +99,9 @@ def _live_affordance_scan(config=FuneralConfig):
         has_plan = PlanFuneralInteraction in affordances
         if has_plan:
             carriers.append(name)
-        lowered = name.lower()
         looks_funeral = (
-            lowered == config.SIM_OBJECT_NAME
-            or any(k in lowered for k in config.FUNERAL_OBJECT_NAME_KEYWORDS)
+            name.lower() == config.SIM_OBJECT_NAME
+            or name_matches(name, config.FUNERAL_OBJECT_NAME_KEYWORDS)
         )
         if looks_funeral and not has_plan:
             missing.append(name)
@@ -134,10 +135,18 @@ def verify_report(config=FuneralConfig):
     else:
         lines.append('sim object: NOT INJECTED (Plan Funeral unreachable via Sim clicks)')
     objects = report.get('objects') or []
-    lines.append('funeral objects injected at load: {}'.format(len(objects)))
+    lines.append('funeral objects injected at load: {} (manager had {} types)'.format(
+        len(objects), report.get('types_count', '?')))
     for entry in objects:
         lines.append('  ' + format_object_check(
             entry.get('name', '?'), entry.get('affordances', {})))
+    phones = report.get('phones') or []
+    if phones:
+        for entry in phones:
+            lines.append('  phone ' + format_object_check(
+                entry.get('name', '?'), entry.get('affordances', {})))
+    else:
+        lines.append('phone objects: none matched (no phone-menu entry)')
 
     carriers, missing = _live_affordance_scan(config)
     lines.append('objects carrying Plan Funeral right now: {}'.format(
@@ -164,8 +173,7 @@ def plan_lines():
     zone_id = _zone_id()
     ev = funeral_event.get_event(zone_id)
     lines = describe_event(ev)
-    debits = [r for r in funeral_event.DEBIT_LOG
-              if getattr(r, 'zone_id', None) in (None, zone_id)]
+    debits = filter_debits_for_zone(funeral_event.DEBIT_LOG, zone_id)
     lines.append(format_debit_summary(debits))
     for record in debits[-15:]:
         lines.append('  ' + record.line())
@@ -210,6 +218,50 @@ def money_lines(config=FuneralConfig):
         if role == 'attendee':
             row += ' paid={}'.format(paid)
         lines.append(row)
+    return lines
+
+
+def objects_lines(keyword=''):
+    """Lines for `funeral.objects <keyword>` — scan tuned object names.
+
+    With no keyword, lists every OBJECT tuning name containing
+    'urn'/'grave'/'sim'/'phone' and whether it carries Plan Funeral.
+    With a keyword, lists every name containing it.
+    """
+    try:
+        manager = services.get_instance_manager(Types.OBJECT)
+    except Exception as exc:
+        return ['OBJECT instance manager unavailable: {!r}'.format(exc)]
+    if manager is None:
+        return ['OBJECT instance manager is None']
+    keyword = (keyword or '').strip().lower()
+    default_keywords = ('urn', 'grave', 'tomb', 'sim', 'phone')
+    rows = []
+    for tuned in getattr(manager, 'types', {}).values():
+        name = getattr(tuned, '__name__', '') or ''
+        if keyword:
+            hit = keyword in name.lower()
+        else:
+            hit = name_matches(name, default_keywords)
+        if not hit:
+            continue
+        affordances = getattr(tuned, '_super_affordances', None) or ()
+        ours = [a.__name__ for a in EXPECTED_FUNERAL_AFFORDANCES
+                if a in affordances]
+        rows.append((name, ours))
+    total = len(getattr(manager, 'types', {}) or {})
+    header = 'OBJECT manager: {} tuned types, {} match{}'.format(
+        total, len(rows),
+        'ing {!r}'.format(keyword) if keyword else 'ing funeral-ish names')
+    lines = [header]
+    if not rows:
+        lines.append('  (no names matched — try `funeral.objects <word>`)')
+        return lines
+    for name, ours in sorted(rows)[:60]:
+        marker = ' <- carries {}'.format(','.join(ours)) if ours else ''
+        lines.append('  {}{}'.format(name, marker))
+    if len(rows) > 60:
+        lines.append('  ...and {} more'.format(len(rows) - 60))
     return lines
 
 

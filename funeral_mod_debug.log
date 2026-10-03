@@ -1,0 +1,38 @@
+==== Funeral Mod v1.1.0 debug log ====
+2026-10-03 15:09:11 [ERROR] import failure: startup hook registration
+Traceback (most recent call last):
+  File "/home/ubuntu/repos/sims4-funeral-mod/tests/../src/funeral_mod/__init__.py", line 34, in <module>
+    import funeral_mod.startup  # noqa: F401
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/repos/sims4-funeral-mod/tests/../src/funeral_mod/startup.py", line 10, in <module>
+    from sims4.resources import Types
+ModuleNotFoundError: No module named 'sims4'
+
+2026-10-03 15:09:11 [ERROR] import failure: command registration
+Traceback (most recent call last):
+  File "/home/ubuntu/repos/sims4-funeral-mod/tests/../src/funeral_mod/__init__.py", line 39, in <module>
+    import funeral_mod.commands  # noqa: F401
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/repos/sims4-funeral-mod/tests/../src/funeral_mod/commands.py", line 18, in <module>
+    from sims4.commands import Command, CommandType, Output
+ModuleNotFoundError: No module named 'sims4'
+
+2026-10-03 15:09:11 [INFO] Funeral Mod v1.1.0 package initialized
+==== Funeral Mod v1.1.0 debug log ====
+2026-10-03 15:09:11 [ERROR] import failure: startup hook registration
+Traceback (most recent call last):
+  File "/work/tests/../src/funeral_mod/__init__.py", line 34, in <module>
+    import funeral_mod.startup  # noqa: F401
+  File "/work/tests/../src/funeral_mod/startup.py", line 10, in <module>
+    from sims4.resources import Types
+ModuleNotFoundError: No module named 'sims4'
+
+2026-10-03 15:09:11 [ERROR] import failure: command registration
+Traceback (most recent call last):
+  File "/work/tests/../src/funeral_mod/__init__.py", line 39, in <module>
+    import funeral_mod.commands  # noqa: F401
+  File "/work/tests/../src/funeral_mod/commands.py", line 18, in <module>
+    from sims4.commands import Command, CommandType, Output
+ModuleNotFoundError: No module named 'sims4'
+
+2026-10-03 15:09:11 [INFO] Funeral Mod v1.1.0 package initialized

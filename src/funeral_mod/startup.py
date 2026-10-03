@@ -14,6 +14,7 @@ import sims4.log
 from funeral_mod import debug_log
 from funeral_mod import event as funeral_event
 from funeral_mod.config import FuneralConfig
+from funeral_mod.dbg import name_matches
 from funeral_mod.injection import add_affordances, on_load_complete
 from funeral_mod.interactions import (
     ConcludeFuneralInteraction,
@@ -36,8 +37,12 @@ SIM_AFFORDANCES = (
 
 def _is_funeral_object(tuned_object, config=FuneralConfig):
     name = getattr(tuned_object, '__name__', '') or ''
-    lowered = name.lower()
-    return any(keyword in lowered for keyword in config.FUNERAL_OBJECT_NAME_KEYWORDS)
+    return name_matches(name, config.FUNERAL_OBJECT_NAME_KEYWORDS)
+
+
+def _is_phone_object(tuned_object, config=FuneralConfig):
+    name = getattr(tuned_object, '__name__', '') or ''
+    return name_matches(name, config.PHONE_OBJECT_NAME_KEYWORDS)
 
 
 def _affordance_report(tuned_object, affordances):
@@ -54,10 +59,13 @@ def _inject_funeral_affordances(object_manager, config=FuneralConfig):
     funeral_event.INJECTION_DONE = True
 
     matched_objects = []
+    phone_objects = []
     sim_injected = False
     report = funeral_event.INJECTION_REPORT
     report['objects'] = []
+    report['phones'] = []
     report['sim'] = None
+    report['types_count'] = len(getattr(object_manager, 'types', {}) or {})
     for tuned_object in getattr(object_manager, 'types', {}).values():
         name = getattr(tuned_object, '__name__', '') or ''
         try:
@@ -75,9 +83,20 @@ def _inject_funeral_affordances(object_manager, config=FuneralConfig):
                     'name': name,
                     'affordances': _affordance_report(tuned_object, URNSTONE_AFFORDANCES),
                 })
+            elif _is_phone_object(tuned_object, config):
+                add_affordances(tuned_object, SIM_AFFORDANCES)
+                phone_objects.append(name)
+                report['phones'].append({
+                    'name': name,
+                    'affordances': _affordance_report(tuned_object, SIM_AFFORDANCES),
+                })
         except Exception:
             logger.exception('failed injecting funeral affordances into %s', name)
             debug_log.exception('affordance injection failed for %s', name)
+
+    if phone_objects:
+        debug_log.info('injection: also added Sim affordances to phone objects %s',
+                       phone_objects)
 
     if not sim_injected:
         logger.warn('could not find the Sim object tuning to inject into')
@@ -89,5 +108,6 @@ def _inject_funeral_affordances(object_manager, config=FuneralConfig):
                        list(config.FUNERAL_OBJECT_NAME_KEYWORDS))
     else:
         logger.info('injected funeral interactions into: %s', matched_objects)
-    debug_log.info('injection complete: sim=%s objects=%s',
-                   sim_injected, matched_objects)
+    debug_log.info('injection complete: sim=%s objects=%s phones=%s (of %s tuned objects)',
+                   sim_injected, matched_objects, phone_objects,
+                   report['types_count'])

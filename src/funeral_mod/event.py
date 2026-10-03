@@ -17,8 +17,10 @@ with sims4.reload.protected(globals()):
     INJECTION_DONE = False
     # What the affordance injection actually did, for `funeral.verify`:
     #   {'sim': {'name': str, 'affordances': {cls_name: present}},
-    #    'objects': [{'name': str, 'affordances': {cls_name: present}}]}
-    INJECTION_REPORT = {'sim': None, 'objects': []}
+    #    'objects': [{'name': str, 'affordances': {cls_name: present}}],
+    #    'phones': [same shape], 'types_count': int}
+    INJECTION_REPORT = {'sim': None, 'objects': [], 'phones': [],
+                        'types_count': 0}
     # Every attempted household debit (dbg.DebitRecord), oldest first.
     # Capped so a long session can't grow it forever.
     DEBIT_LOG = []
