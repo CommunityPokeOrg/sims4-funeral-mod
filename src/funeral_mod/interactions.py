@@ -21,6 +21,7 @@ from funeral_mod.attendees import (
     gather_attendee_candidates,
 )
 from funeral_mod.config import FuneralConfig
+from funeral_mod import debug_log
 from funeral_mod import event as funeral_event
 from funeral_mod.funds import can_afford, charge_host, refund
 from funeral_mod.localize import localized_factory
@@ -76,21 +77,29 @@ def _summon_attendee(sim_id):
     try:
         import sims.sim_spawner
         sims.sim_spawner.SimSpawner.load_sim(sim_id)
+        debug_log.info('summoned attendee sim_id=%s', sim_id)
         return True
     except Exception:
         logger.exception('failed to summon sim %s', sim_id)
+        debug_log.exception('summon failed for sim_id=%s', sim_id)
         return False
 
 
 def _apply_mourning_buff(sim_info, config):
     buff = _find_tuned_instance_by_keywords(Types.BUFF, config.MOURNING_BUFF_KEYWORDS)
     if buff is None:
+        debug_log.debug('no mourning buff matched keywords %s',
+                        list(config.MOURNING_BUFF_KEYWORDS))
         return False
     try:
         sim_info.add_buff(buff)
+        debug_log.debug('mourning buff %s applied to sim_id=%s',
+                        getattr(buff, '__name__', buff),
+                        getattr(sim_info, 'sim_id', None))
         return True
     except Exception:
         logger.exception('failed applying mourning buff to %s', sim_info)
+        debug_log.exception('mourning buff failed for %s', sim_info)
         return False
 
 
@@ -120,20 +129,28 @@ class PlanFuneralInteraction(ImmediateSuperInteraction):
     def _test(cls, target, context, config=FuneralConfig, **kwargs):
         sim = getattr(context, 'sim', None)
         if sim is None:
+            debug_log.debug('Plan Funeral hidden: context has no sim')
             return TestResult(False, 'Funerals need a Sim host.')
         sim_info = getattr(sim, 'sim_info', None)
         if sim_info is None:
+            debug_log.debug('Plan Funeral hidden: sim has no sim_info')
             return TestResult(False, 'Funerals need a Sim host.')
 
         zone_id = _zone_id()
         if funeral_event.has_active_funeral(zone_id):
+            debug_log.debug('Plan Funeral hidden: funeral already active in zone %s',
+                            zone_id)
             return TestResult(False, 'A funeral is already in progress.')
 
         if not can_afford(sim_info, config.HOST_FEE):
+            debug_log.debug('Plan Funeral hidden: host sim_id=%s cannot afford §%s',
+                            getattr(sim_info, 'sim_id', None), config.HOST_FEE)
             return TestResult(
                 False,
                 'Hosting a funeral costs §{}. You cannot afford it.'.format(config.HOST_FEE),
             )
+        debug_log.debug('Plan Funeral visible for host sim_id=%s',
+                        getattr(sim_info, 'sim_id', None))
         return TestResult.TRUE
 
     def _run_interaction_gen(self, timeline, config=FuneralConfig):
@@ -148,8 +165,13 @@ class PlanFuneralInteraction(ImmediateSuperInteraction):
 
         deceased_info = _deceased_sim_info(self.target)
         deceased_name = _deceased_name(deceased_info)
+        debug_log.info('Plan Funeral started: host=%s deceased=%s target=%s',
+                       getattr(host_info, 'sim_id', None), deceased_name,
+                       getattr(self.target, 'id', None))
 
         rows = gather_attendee_candidates(host_info, config)
+        debug_log.info('attendee candidates: %s rows (%s affordable)',
+                       len(rows), sum(1 for (_si, ok) in rows if ok))
         if not rows:
             # Nobody to invite: still allow a private funeral for the fee.
             self._start_funeral(zone_id, host_info, deceased_info, deceased_name, [])
@@ -160,6 +182,7 @@ class PlanFuneralInteraction(ImmediateSuperInteraction):
             # Picker failed to build: degrade to a private funeral rather
             # than doing nothing at all.
             logger.warn('attendee picker unavailable; running private funeral')
+            debug_log.info('UiSimPicker could not be built; private funeral fallback')
             self._start_funeral(zone_id, host_info, deceased_info, deceased_name, [])
             return True
 
@@ -167,25 +190,31 @@ class PlanFuneralInteraction(ImmediateSuperInteraction):
 
         def on_response(picker_dialog):
             if not getattr(picker_dialog, 'accepted', False):
+                debug_log.info('attendee picker cancelled')
                 return
             picked_ids = collect_picked_sim_ids(picker_dialog)
             picked_infos = [attendee_map[sim_id] for sim_id in picked_ids if sim_id in attendee_map]
+            debug_log.info('attendee picker picked %s (resolved %s)',
+                           picked_ids, [getattr(i, 'sim_id', None) for i in picked_infos])
             self._start_funeral(zone_id, host_info, deceased_info, deceased_name, picked_infos)
 
         try:
             dialog.show_dialog(on_response=on_response)
         except Exception:
             logger.exception('failed to show attendee picker')
+            debug_log.exception('attendee picker show_dialog failed')
             return False
         return True
 
     def _start_funeral(self, zone_id, host_info, deceased_info, deceased_name, attendee_infos, config=FuneralConfig):
         # Host fee first; abort cleanly if the charge fails.
-        if not charge_host(host_info, config.HOST_FEE, host_sim=self.sim):
+        if not charge_host(host_info, config.HOST_FEE, host_sim=self.sim, zone_id=zone_id):
+            debug_log.info('host fee §%s could not be collected from sim_id=%s; aborting',
+                           config.HOST_FEE, getattr(host_info, 'sim_id', None))
             show_notification(host_info, 'The funeral could not be paid for.', title='Funeral')
             return
 
-        paid_ids = charge_attendees(attendee_infos, config)
+        paid_ids = charge_attendees(attendee_infos, config, zone_id=zone_id)
 
         ev = funeral_event.FuneralEvent(
             zone_id=zone_id,
@@ -198,6 +227,8 @@ class PlanFuneralInteraction(ImmediateSuperInteraction):
         )
         ev.paid_attendee_ids.update(paid_ids)
         funeral_event.start_event(ev)
+        debug_log.info('funeral started in zone %s: attendees=%s paid=%s',
+                       zone_id, list(ev.attendee_ids), paid_ids)
 
         if config.SUMMON_ATTENDEES:
             for sim_id in ev.attendee_ids:
@@ -247,6 +278,8 @@ class GiveEulogyInteraction(ImmediateSuperInteraction):
         if ev is None:
             return False
         ev.record_eulogy(sim_info.sim_id)
+        debug_log.info('eulogy #{} by sim_id={} (zone {})'.format(
+            ev.eulogies, sim_info.sim_id, ev.zone_id))
         _apply_mourning_buff(sim_info, config)
         name = _deceased_name(_deceased_sim_info(self.target))
         try:
@@ -290,6 +323,8 @@ class ConcludeFuneralInteraction(ImmediateSuperInteraction):
         if ev is None:
             return False
         funeral_event.end_event(ev.zone_id)
+        debug_log.info('funeral concluded in zone %s: eulogies=%s attendees=%s',
+                       ev.zone_id, ev.eulogies, ev.attendee_count)
         name = 'the deceased'
         if ev.deceased_sim_id is not None:
             try:

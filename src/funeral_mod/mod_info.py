@@ -3,7 +3,7 @@
 
 MOD_NAME = 'Funeral Mod'
 MOD_AUTHOR = 'CommunityPoke'
-MOD_VERSION = '1.0.0'
+MOD_VERSION = '1.1.0'
 MOD_QUALIFIED_NAME = 'communitypoke.funeral_mod'
 MOD_LOGGING_NAME = 'funeral_mod'
 

@@ -15,6 +15,24 @@ with sims4.reload.protected(globals()):
     ACTIVE_FUNERALS = {}
     # Survives reload too; injected only once per game session.
     INJECTION_DONE = False
+    # What the affordance injection actually did, for `funeral.verify`:
+    #   {'sim': {'name': str, 'affordances': {cls_name: present}},
+    #    'objects': [{'name': str, 'affordances': {cls_name: present}}]}
+    INJECTION_REPORT = {'sim': None, 'objects': []}
+    # Every attempted household debit (dbg.DebitRecord), oldest first.
+    # Capped so a long session can't grow it forever.
+    DEBIT_LOG = []
+
+
+_MAX_DEBIT_LOG = 200
+
+
+def record_debit(record):
+    """Append a dbg.DebitRecord to the session debit log."""
+    DEBIT_LOG.append(record)
+    if len(DEBIT_LOG) > _MAX_DEBIT_LOG:
+        del DEBIT_LOG[: len(DEBIT_LOG) - _MAX_DEBIT_LOG]
+    return record
 
 
 class FuneralEvent:

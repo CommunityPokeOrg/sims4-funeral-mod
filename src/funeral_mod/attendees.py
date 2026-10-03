@@ -151,7 +151,7 @@ def collect_picked_sim_ids(dialog):
         return []
 
 
-def charge_attendees(attendee_infos, config=FuneralConfig):
+def charge_attendees(attendee_infos, config=FuneralConfig, zone_id=None):
     """Charge every attendee's household ``ATTENDEE_FEE``.
 
     Returns the list of sim_ids that were actually charged.  NPC households
@@ -160,6 +160,6 @@ def charge_attendees(attendee_infos, config=FuneralConfig):
     """
     paid = []
     for sim_info in attendee_infos:
-        if charge_attendee(sim_info, config.ATTENDEE_FEE):
+        if charge_attendee(sim_info, config.ATTENDEE_FEE, zone_id=zone_id):
             paid.append(getattr(sim_info, 'sim_id', None))
     return [sim_id for sim_id in paid if sim_id is not None]

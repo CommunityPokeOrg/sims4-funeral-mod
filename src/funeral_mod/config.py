@@ -72,3 +72,15 @@ class FuneralConfig:
         'mourn',
         'grieve',
     )
+
+    # --- Debugging -----------------------------------------------------
+    # Write funeral_mod_debug.log next to the .ts4script in the Mods folder
+    # (cwd/temp fallback).  Toggle at runtime with `funeral.debug on|off`.
+    DEBUG_LOGGING = True
+
+    # Also write debug-chatter lines (menu visibility tests, picker rows,
+    # summon attempts).  Toggle with `funeral.debug verbose` / `... info`.
+    DEBUG_VERBOSE = True
+
+    # Name of the debug log file created beside the mod / in cwd.
+    DEBUG_LOG_FILENAME = 'funeral_mod_debug.log'
