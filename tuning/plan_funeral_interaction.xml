@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  REFERENCE ONLY — this file is not loaded by the game.
+
+  If the mod shipped a .package, "Plan Funeral…" would be tuned roughly like
+  this.  The script implements the same behaviour in
+  src/funeral_mod/interactions.py (PlanFuneralInteraction).
+-->
+<I i="interaction" m="funeral_mod.interactions" n="funeral_PlanFuneral" s="0" >
+  <T n="display_name">Plan Funeral…</T>
+  <T n="display_tooltip">Host a funeral for the Sim resting here. Costs §764 to host; each attendee pays §63 to attend.</T>
+  <T n="visible">True</T>
+  <T n="allow_autonomous">False</T>
+</I>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  REFERENCE ONLY — this file is not loaded by the game.
+
+  The attendee invite picker is created in script with
+  ``create_factory_wrapper(UiSimPicker, ...)`` in
+  src/funeral_mod/attendees.py.  In an XML-driven mod it would be tuned as a
+  sim picker dialog roughly like this:
+-->
+<U t="in_dialog">
+  <V n="dialog_type" t="sims_picker" />
+  <T n="title">Invite Mourners</T>
+  <T n="text">Choose who attends the funeral. Each attendee pays §63 to attend.</T>
+  <V n="max_selectable" t="static_count">
+    <T n="number_selectable">12</T>
+  </V>
+  <T n="min_selectable">0</T>
+</U>

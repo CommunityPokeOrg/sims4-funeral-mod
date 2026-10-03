@@ -1,0 +1,51 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    # The Sims 4 embeds Python 3.7, so the package is built inside the
+    # matching interpreter to produce compatible .pyc bytecode.
+    container: python:3.7-slim
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile-check all mod sources (py3.7 syntax gate)
+        run: python -m compileall -q src
+
+      - name: Unit tests (pure-Python economy logic)
+        run: python -m unittest discover -s tests -v
+
+      - name: Build .ts4script package
+        run: python tools/build_ts4script.py
+
+      - name: Verify archive contents
+        run: |
+          python - <<'EOF'
+          import zipfile
+          names = zipfile.ZipFile('build/CommunityPoke_FuneralMod.ts4script').namelist()
+          required = {
+              'funeral_mod/__init__.pyc',
+              'funeral_mod/interactions.pyc',
+              'funeral_mod/startup.pyc',
+          }
+          missing = required - set(names)
+          assert not missing, 'missing compiled modules: {}'.format(missing)
+          print('archive OK: {} entries'.format(len(names)))
+          EOF
+
+      - name: Upload .ts4script artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CommunityPoke_FuneralMod.ts4script
+          path: build/CommunityPoke_FuneralMod.ts4script
+          if-no-files-found: error
