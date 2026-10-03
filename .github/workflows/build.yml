@@ -3,6 +3,7 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 
@@ -49,3 +50,45 @@ jobs:
           name: CommunityPoke_FuneralMod.ts4script
           path: build/CommunityPoke_FuneralMod.ts4script
           if-no-files-found: error
+
+  # The same suite on macOS: macos-13 is the x64 image, the only hosted
+  # macOS runner where actions/setup-python still ships Python 3.7
+  # (3.7.17 darwin-x64), matching the game's embedded interpreter.
+  test-macos:
+    runs-on: macos-13
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.7'
+
+      - name: Compile-check all mod sources (py3.7 syntax gate)
+        run: python -m compileall -q src
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Build .ts4script package
+        run: python tools/build_ts4script.py
+
+  # Publish the packaged mod to GitHub Releases whenever a v* tag lands.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test-and-package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: CommunityPoke_FuneralMod.ts4script
+          path: build
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/CommunityPoke_FuneralMod.ts4script
+          generate_release_notes: true

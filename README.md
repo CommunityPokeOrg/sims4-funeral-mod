@@ -72,12 +72,52 @@ string-table (STBL) package is needed.
 
 ### Cheat / debug commands
 
-With TestingCheats enabled:
+With TestingCheats enabled (Ctrl+Shift+C → `testingcheats on`):
 
 * `funeral.prices` — print the configured fees.
 * `funeral.status` — print whether a funeral is active on this lot and
-  who the host/deceased are.
+  who the host/deceased are, plus a one-line debit summary.
 * `funeral.end` — force-end the active funeral on this lot (if any).
+* `funeral.verify` — **self-check**. Reports whether the pie-menu
+  injection ran, which tuned objects carry Plan Funeral right now (and
+  which keyword-matched objects are missing it), whether the fees are
+  the expected §764/§63, whether a mourning buff was found, the active
+  funeral's state, and a summary of every debit attempted.
+* `funeral.plan` — dump the active funeral's plan: attendee ids, which
+  attendees actually paid, eulogy count, and the recent debit records
+  (household funds **before → after** for every charge, marked
+  `verified` when the balance dropped by exactly the fee).
+* `funeral.money` — household funds of the selected Sim plus every
+  host/attendee of the active funeral, with affordability flags.
+* `funeral.attendees` — dry-run of the invite picker for the selected
+  Sim: every candidate row with their household balance and whether
+  §63 is affordable.
+* `funeral.objects [word]` — scan tuned OBJECT names. With no argument
+  it lists urn/grave/sim/phone-ish objects and marks which carry
+  Plan Funeral; with a word it lists every name containing it
+  (e.g. `funeral.objects urn`).
+* `funeral.debug on|info|off` — toggle the file log
+  (`funeral.debug` alone prints status and the file path).
+* `funeral.log` — print the last 30 lines of the debug log file.
+
+### In-game debug logging
+
+The mod writes `funeral_mod_debug.log` next to the `.ts4script` inside
+your Mods folder (falling back to the game's working directory). It
+records every charge with the household balance before **and** after —
+the quickest way to confirm the §764 host fee and each §63 attendee fee
+actually moved — plus injection results, picker outcomes, summons, buffs
+and eulogies. `funeral.debug off` silences it; `funeral.debug info`
+keeps lifecycle events but drops per-click chatter. Attach this file to
+any bug report.
+
+If **Plan Funeral does not appear** in a menu: run `funeral.verify`
+first — `affordance injection ran: False`, a `NOT INJECTED` Sim object,
+or an empty carriers list each identify a different failure stage.
+`funeral.objects` shows whether the urn/gravestone you're clicking is
+among the tuned objects the mod injected into (pack-specific or CC
+remains may use names outside `FUNERAL_OBJECT_NAME_KEYWORDS` — extend
+the keyword list in `config.py` and rebuild).
 
 ## Configuration options
 
@@ -95,6 +135,10 @@ All settings live in `src/funeral_mod/config.py` as class attributes on
 | `FUNERAL_OBJECT_NAME_KEYWORDS` | urn/gravestone keywords | Tuned-object class names that get the interactions |
 | `MOURNING_BUFF_KEYWORDS` | `('mourn', 'sad')` | Buff names searched for the mourning mood |
 | `MOURN_INTERACTION_KEYWORDS` | `('mourn', 'grieve')` | Reserved for future use |
+| `DEBUG_LOGGING` | `True` | Write `funeral_mod_debug.log` beside the mod (toggle live with `funeral.debug`) |
+| `DEBUG_VERBOSE` | `True` | Also log per-click chatter (menu tests, picker rows) |
+| `DEBUG_LOG_FILENAME` | `funeral_mod_debug.log` | Debug log file name |
+| `PHONE_OBJECT_NAME_KEYWORDS` | `('phone', 'cellphone', 'smartphone')` | Tuned-object names that also get the Sim funeral affordances (phone-menu reach, best effort) |
 
 ## Building
 
@@ -116,11 +160,14 @@ Output: `build/CommunityPoke_FuneralMod.ts4script`
 python3 -m unittest discover -s tests -v
 ```
 
-15 unit tests cover the pure-Python economy logic (the §764/§63 rules,
-affordability, charge planning, attendee dedup/capping) — everything that
-can be tested without the game. `tests/test_logic.py` doubles as a spec
-for the required pricing. `python -m compileall -q src` gates the source
-to Python 3.7-compatible syntax in CI.
+42 unit tests cover the pure-Python economy logic (the §764/§63 rules,
+affordability, charge planning, attendee dedup/capping) and the devtools
+formatters/debit records/log writer (`tests/test_devtools.py`) —
+everything that can be tested without the game. `tests/test_logic.py`
+doubles as a spec for the required pricing. `python -m compileall -q src`
+gates the source to Python 3.7-compatible syntax in CI (which runs the
+suite on both `ubuntu-latest` and `macos-13`, and publishes the
+`.ts4script` to Releases when a `v*` tag is pushed).
 
 ## What could NOT be tested without the game
 
@@ -133,19 +180,48 @@ environment. Concretely unverified:
 
 * Whether the interaction actually appears on urns/gravestones/Sims in
   the pie menu (the keyword matching on tuned object names may need
-  tweaking for specific packs/CC urnstones).
+  tweaking for specific packs/CC urnstones). Run `funeral.verify` in the
+  cheat console — it lists exactly which objects carry the interaction
+  and which matched objects are missing it.
 * Whether `UiSimPicker` renders exactly as tuned and returns the expected
   result tags.
 * Real money debit for **other** households relies on
   `FamilyFunds.try_remove(..., sim=None)` debiting that household — the
-  decompiled code says it does, but it's untested live.
+  decompiled code says it does, but it's untested live. `funeral.plan`
+  and `funeral_mod_debug.log` show the observed household balance
+  before→after for every debit, flagged `verified` when the drop
+  matches the fee.
 * Summoning, mourning buffs, and notification timing during an actual
   play session.
 * Behavior when the host travels/moves during a funeral (zone reloads
   are guarded by `sims4.reload.protected`, but not exercised).
 
 If you test in-game, please report findings as a GitHub issue — good or
-bad.
+bad — and attach `funeral_mod_debug.log` plus the output of
+`funeral.verify`.
+
+## MCCC (MC Command Center) compatibility
+
+MC Command Center (Deaderpool) is a closed-source mod distributed only
+as compiled `.ts4script`/`.package` files, with **no public module API,
+plugin interface, or documented hook for third-party content** — its
+Sim/computer menus are populated internally by its own modules. There is
+therefore no supported way to put *Plan Funeral* inside the
+"MC Command Center" pie menu, and unofficially monkey-patching MCCC's
+internal classes would break on every MCCC update, so this mod
+deliberately does not attempt it.
+
+What *is* available without MCCC integration:
+
+* Plan/Conclude Funeral are injected onto **Sims themselves** (same menu
+  level where MCCC's entry lives), onto urns/gravestones, and — best
+  effort — onto phone objects, so no MCCC menu is needed to reach them.
+* All `funeral.*` cheat commands work alongside MCCC's own `mc_*`
+  console commands; the two mods do not interact or conflict (they touch
+  different affordances and tunings).
+* If a future MCCC release ever ships a documented third-party module
+  interface, `tuning/` + `interactions.py` are structured so a menu
+  entry could be contributed then.
 
 ## Repository layout
 
